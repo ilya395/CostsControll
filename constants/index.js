@@ -11,6 +11,8 @@ export const BD_NAME = process.env.BD_NAME;
 
 export const START_SESSION_ACTION = "START_SESSION_ACTION";
 export const ADD_EXPENSE_ITEM = "Добавь статью расходов";
+export const CHANGE_EXPENSE_ITEM = "Измени статью расходов";
+export const DELETE_EXPENSE_ITEM = "Убери статью расходов";
 export const ADD_COST = "Добавь траты";
 export const SHOW_EXPENSE_ITEM = "Покажи статьи расходов";
 export const SHOW_COSTS_FOR_THIS_MONTH = "Расходы за этот месяц";
@@ -29,3 +31,11 @@ export const ADD_TODAY_ACTION = "ADD_TODAY_ACTION";
 export const ADD_DESCRIPTION_ACTION = "ADD_DESCRIPTION_ACTION";
 
 export const CUSSECC_SAVE_COST_ACTION = "CUSSECC_SAVE_COST_ACTION";
+
+export const CHANGE_EXPENSE_ITEM_ACTION = "CHANGE_EXPENSE_ITEM_ACTION";
+export const EDIT_OR_DELETE_ACTION = "EDIT_OR_DELETE_ACTION";
+export const EDIT_OR_DELETE_EXPENSE_ITEM_ACTION = "EDIT_OR_DELETE_EXPENSE_ITEM_ACTION";
+export const SUCCESS_EDIT_EXPENSE_ITEM_ACTION = "SUCCESS_EDIT_EXPENSE_ITEM_ACTION";
+export const EDIT_EXPENSE_ITEM_ACTION = "EDIT_EXPENSE_ITEM_ACTION";
+export const DELETE_EXPENSE_ITEM_ACTION = "DELETE_EXPENSE_ITEM_ACTION";
+export const SUCCESS_DELETE_EXPENSE_ITEM_ACTION = "SUCCESS_DELETE_EXPENSE_ITEM_ACTION";

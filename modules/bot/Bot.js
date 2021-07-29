@@ -4,9 +4,9 @@
 // const { session } = require('@telegraf/session');
 import { Telegraf } from 'telegraf';
 import session from '@telegraf/session';
-import { ADD_COST, ADD_COST_ACTION, ADD_EXPENSE_ITEM, ADD_NEW_EXPENSE_ITEM_ACTION, ADD_EXPENSE_ITEM_ACTION, BOT_TOKEN, SAVE_EXPENSE_ITEM_SUCCESS_ACTION, START_SESSION_ACTION, ADD_DATE_ACTION, ADD_COST_TODAY, ADD_COST_OTHER_DAY, ADD_DESCRIPTION_ACTION, CUSSECC_SAVE_COST_ACTION, ADD_TODAY_ACTION, ADD_OTHER_DAY_ACTION, SHOW_COSTS_FOR_THIS_MONTH, SELECT_MONTH_SEE_EXPENSES, SHOW_EXPENSE_ITEM } from '../../constants/index.js';
+import { ADD_COST, ADD_COST_ACTION, ADD_EXPENSE_ITEM, ADD_NEW_EXPENSE_ITEM_ACTION, ADD_EXPENSE_ITEM_ACTION, BOT_TOKEN, SAVE_EXPENSE_ITEM_SUCCESS_ACTION, START_SESSION_ACTION, ADD_DATE_ACTION, ADD_COST_TODAY, ADD_COST_OTHER_DAY, ADD_DESCRIPTION_ACTION, CUSSECC_SAVE_COST_ACTION, ADD_TODAY_ACTION, ADD_OTHER_DAY_ACTION, SHOW_COSTS_FOR_THIS_MONTH, SELECT_MONTH_SEE_EXPENSES, SHOW_EXPENSE_ITEM, CHANGE_EXPENSE_ITEM_ACTION, EDIT_OR_DELETE_ACTION, EDIT_EXPENSE_ITEM_ACTION, EDIT_OR_DELETE_EXPENSE_ITEM_ACTION, SUCCESS_EDIT_EXPENSE_ITEM_ACTION, DELETE_EXPENSE_ITEM_ACTION, SUCCESS_DELETE_EXPENSE_ITEM_ACTION } from '../../constants/index.js';
 import { costController, expenseItemsController, userController } from '../../controllers/index.js';
-import { chooseDateKeyboard, expenseItemKeyboard, getMainMenu, yesNoKeyboard } from '../../utils/keybords/index.js';
+import { chooseDateKeyboard, EditKeyboard, expenseItemEditKeyboard, expenseItemKeyboard, getMainMenu, yesNoKeyboard } from '../../utils/keybords/index.js';
 
 const Bot = new Telegraf(BOT_TOKEN);
 
@@ -86,16 +86,42 @@ export const BotModule = () => {
       'Чтобы просмотреть расходы за интересующий тебя месяц, просто напиши дату в формате ММ.ГГГГ и отправь боту'
     );
   });
-  Bot.hears(SHOW_EXPENSE_ITEM, async ctx => {
+  Bot.hears(SHOW_EXPENSE_ITEM, async ctx => { // *
     ctx.session.status = SHOW_EXPENSE_ITEM;
     const items = await expenseItemsController.getItems(ctx.session.user.id);
     if (items.length > 0) {
-      const result = items.reduce((accumulator, item) => {
-        return accumulator + `${item.name}\n`;
-      }, "");
-      ctx.replyWithHTML(`<b>Список Статей расходов:</b>\n\n${result}`)
+      // const result = items.reduce((accumulator, item) => {
+      //   return accumulator + `${item.name}\n`;
+      // }, "");
+
+      // ctx.replyWithHTML(`<b>Список Статей расходов:</b>\n\n${result}`)
+      // const menu = await expenseItemEditKeyboard(ctx.session.user.id);
+      // ctx.reply(`Список Статей расходов: `, menu);
+
+      const keyboard = await expenseItemKeyboard(ctx.session.user.id);
+      ctx.reply(
+        'Список Статей расходов(кликни для редактирования или уаления): ',
+        keyboard
+      );
+      ctx.session.status = CHANGE_EXPENSE_ITEM_ACTION;
     } else {
       ctx.reply('Статей расходов нет...');
+    }
+  });
+  Bot.action(['edit', 'delete'], async ctx => {
+    const status = ctx.session.status;
+    if (status === EDIT_OR_DELETE_EXPENSE_ITEM_ACTION) {
+      if (ctx.callbackQuery.data === 'delete') {
+        ctx.replyWithHTML(
+          `Вы действительно хотите удалить эту Статью расходов?`,
+          yesNoKeyboard()
+        )
+        ctx.session.status = DELETE_EXPENSE_ITEM_ACTION;
+      }
+      if (ctx.callbackQuery.data === 'edit') {
+        ctx.editMessageText('Введите новое название Статьи расходов');
+        ctx.session.status = EDIT_EXPENSE_ITEM_ACTION;
+      }
     }
   });
   Bot.on('text', async ctx => {
@@ -185,6 +211,14 @@ export const BotModule = () => {
         }
         break;
 
+      case EDIT_EXPENSE_ITEM_ACTION:
+        ctx.session.changeExpenseItemTitle = ctx.message.text;
+        ctx.replyWithHTML(
+          `Вы действительно хотите изменить Статью расходов на:\n\n`+
+          `<i>${ctx.message.text}</i>`,
+          yesNoKeyboard()
+        )
+
       default:
         break;
     }
@@ -210,7 +244,7 @@ export const BotModule = () => {
 
       case ADD_COST_ACTION:
         if (ctx.callbackQuery.data === 'yes') {
-          const keyboard = await expenseItemKeyboard();
+          const keyboard = await expenseItemKeyboard(ctx.session.user.id);
           ctx.reply(
             'Выберите Статью расходов: ',
             keyboard
@@ -233,7 +267,7 @@ export const BotModule = () => {
         } else {
           ctx.reply(
             'Выберите Статью расходов: ',
-            expenseItemKeyboard()
+            expenseItemKeyboard(ctx.session.user.id)
           );
           ctx.session.status = ADD_EXPENSE_ITEM_ACTION;
         }
@@ -273,6 +307,58 @@ export const BotModule = () => {
         }
         break;
 
+      case EDIT_EXPENSE_ITEM_ACTION:
+        if (ctx.callbackQuery.data === 'yes') {
+          const { id } = ctx.session.changeExpenseItem;
+          const data = {
+            title: ctx.session.changeExpenseItemTitle,
+            id,
+            userId: ctx.session.user.id
+          }
+          const expenseItemsArray = await expenseItemsController.setTitle(data);
+          ctx.editMessageText('Данные успешно изменены!');
+          ctx.session.status = SUCCESS_EDIT_EXPENSE_ITEM_ACTION;
+        } else { // *
+          ctx.session.status = SHOW_EXPENSE_ITEM;
+          const items = await expenseItemsController.getItems(ctx.session.user.id);
+          if (items.length > 0) {
+            const keyboard = await expenseItemKeyboard(ctx.session.user.id);
+            ctx.reply(
+              'Список Статей расходов(кликни для редактирования или уаления): ',
+              keyboard
+            );
+            ctx.session.status = CHANGE_EXPENSE_ITEM_ACTION;
+          } else {
+            ctx.reply('Статей расходов нет...');
+          }
+        }
+        break;
+
+      case DELETE_EXPENSE_ITEM_ACTION:
+        if (ctx.callbackQuery.data === 'yes') {
+          const data = {
+            id: ctx.session.changeExpenseItem.id,
+            userId: ctx.session.user.id,
+          }
+          const del = await expenseItemsController.deleteItem(data);
+          ctx.editMessageText('Статья успешно удалена')
+          ctx.session.status = SUCCESS_DELETE_EXPENSE_ITEM_ACTION;
+        } else { // *
+          ctx.session.status = SHOW_EXPENSE_ITEM;
+          const items = await expenseItemsController.getItems(ctx.session.user.id);
+          if (items.length > 0) {
+            const keyboard = await expenseItemKeyboard(ctx.session.user.id);
+            ctx.reply(
+              'Список Статей расходов(кликни для редактирования или уаления): ',
+              keyboard
+            );
+            ctx.session.status = CHANGE_EXPENSE_ITEM_ACTION;
+          } else {
+            ctx.reply('Статей расходов нет...');
+          }
+        }
+        break;
+
       default:
         break;
     }
@@ -301,7 +387,8 @@ export const BotModule = () => {
   });
 
   Bot.action(async (ctx) => { // перечень статей расхода
-    const items = await expenseItemsController.getItems(ctx.session.user.id);
+    const array = ctx.split('/');
+    const items = await expenseItemsController.getItems(+array[2]);
     return items.map(item => `expenseItem/${item.id}`)
   }, async ctx => {
     const status = ctx.session.status;
@@ -310,7 +397,8 @@ export const BotModule = () => {
       const subStringArray = string.split('/');
       ctx.session.expenseItem = {
         id: +subStringArray[1],
-        name: null
+        name: null,
+        userId: +subStringArray[2]
       };
 
       const expenseItemsArray = await expenseItemsController.getItems(ctx.session.user.id);
@@ -321,6 +409,27 @@ export const BotModule = () => {
         `<i>${ctx.session.expenseItem.name}</i>`,
         yesNoKeyboard()
       )
+    }
+    if (status === CHANGE_EXPENSE_ITEM_ACTION) {
+      const string = ctx.callbackQuery.data;
+      const subStringArray = string.split('/');
+      ctx.session.changeExpenseItem = {
+        id: +subStringArray[1],
+        name: null,
+        slug: subStringArray[0],
+        userId: +subStringArray[2]
+      };
+      const expenseItemsArray = await expenseItemsController.getItems(ctx.session.user.id);
+      ctx.session.changeExpenseItem.name = expenseItemsArray.find(item => +item.id === +ctx.session.changeExpenseItem.id).name;
+      ctx.replyWithHTML(
+        `Что сделать со Статьей расходов: ${ctx.session.changeExpenseItem.name}\n\n`,
+        EditKeyboard()
+        // EditKeyboard({
+        //   id: ctx.session.changeExpenseItem.id,
+        //   slug: ctx.session.changeExpenseItem.slug,
+        // })
+      );
+      ctx.session.status = EDIT_OR_DELETE_EXPENSE_ITEM_ACTION;
     }
   });
 
