@@ -1,12 +1,8 @@
-// require('dotenv').config();
-
-// const { Telegraf } = require('telegraf');
-// const { session } = require('@telegraf/session');
 import { Telegraf } from 'telegraf';
 import session from '@telegraf/session';
-import { ADD_COST, ADD_COST_ACTION, ADD_EXPENSE_ITEM, ADD_NEW_EXPENSE_ITEM_ACTION, ADD_EXPENSE_ITEM_ACTION, BOT_TOKEN, SAVE_EXPENSE_ITEM_SUCCESS_ACTION, START_SESSION_ACTION, ADD_DATE_ACTION, ADD_COST_TODAY, ADD_COST_OTHER_DAY, ADD_DESCRIPTION_ACTION, CUSSECC_SAVE_COST_ACTION, ADD_TODAY_ACTION, ADD_OTHER_DAY_ACTION, SHOW_COSTS_FOR_THIS_MONTH, SELECT_MONTH_SEE_EXPENSES, SHOW_EXPENSE_ITEM, CHANGE_EXPENSE_ITEM_ACTION, EDIT_OR_DELETE_ACTION, EDIT_EXPENSE_ITEM_ACTION, EDIT_OR_DELETE_EXPENSE_ITEM_ACTION, SUCCESS_EDIT_EXPENSE_ITEM_ACTION, DELETE_EXPENSE_ITEM_ACTION, SUCCESS_DELETE_EXPENSE_ITEM_ACTION } from '../../constants/index.js';
+import { ADD_COST, ADD_COST_ACTION, ADD_EXPENSE_ITEM, ADD_NEW_EXPENSE_ITEM_ACTION, ADD_EXPENSE_ITEM_ACTION, BOT_TOKEN, SAVE_EXPENSE_ITEM_SUCCESS_ACTION, START_SESSION_ACTION, ADD_DATE_ACTION, ADD_COST_TODAY, ADD_COST_OTHER_DAY, ADD_DESCRIPTION_ACTION, CUSSECC_SAVE_COST_ACTION, ADD_TODAY_ACTION, ADD_OTHER_DAY_ACTION, SHOW_COSTS_FOR_THIS_MONTH, SELECT_MONTH_SEE_EXPENSES, SHOW_EXPENSE_ITEM, CHANGE_EXPENSE_ITEM_ACTION, EDIT_OR_DELETE_ACTION, EDIT_EXPENSE_ITEM_ACTION, EDIT_OR_DELETE_EXPENSE_ITEM_ACTION, SUCCESS_EDIT_EXPENSE_ITEM_ACTION, DELETE_EXPENSE_ITEM_ACTION, SUCCESS_DELETE_EXPENSE_ITEM_ACTION, SELECT_DATE_SEE_EXPENSES, SHOW_COSTS_FOR_DATE, SELECT_DATE_CHOOSE_COST, EDIT_OR_DELETE_COST_ACTION, EDIT_COST_AMOUNT_ACTION, EDIT_COST_EXPENSE_ITEM_ACTION, EDIT_COST_DAY_ACTION, EDIT_COST_DESCRIPTION_ACTION, DELETED_COST_ACTION, EDIT_COST_ADD_NEW_DAY_ACTION, EDIT_COST_ADD_NEW_DESCRIPTION_ACTION, DELETE_COST_ACTION, EDIT_COST_ACTION, EDIT_COST_ADD_NEW_EXPENSE_ITEM_ACTION, EDIT_COST_ADD_NEW_AMOUNT_ACTION, SUCCESS_EDIT_COST_ACTION, ERROR_ACTION } from '../../constants/index.js';
 import { costController, expenseItemsController, userController } from '../../controllers/index.js';
-import { chooseDateKeyboard, EditKeyboard, expenseItemEditKeyboard, expenseItemKeyboard, getMainMenu, yesNoKeyboard } from '../../utils/keybords/index.js';
+import { chooseCostKeyboard, chooseDateKeyboard, costsKeyboard, EditKeyboard,  expenseItemKeyboard, getMainMenu, yesNoKeyboard } from '../../utils/keybords/index.js';
 
 const Bot = new Telegraf(BOT_TOKEN);
 
@@ -58,8 +54,8 @@ export const BotModule = () => {
     ctx.session.status = SHOW_COSTS_FOR_THIS_MONTH;
     const today = new Date();
     const todayTimestamp = today.getTime();
-    const firstDay = (new Date(today.getFullYear(), today.getMonth(), 1, 12)).getTime();
-    const lastDay = (new Date(today.getFullYear(), today.getMonth() + 1, 0, 12)).getTime();
+    const firstDay = (new Date(today.getFullYear(), today.getMonth(), 1)).getTime();
+    const lastDay = (new Date(today.getFullYear(), today.getMonth() + 1, 0)).getTime();
     const data = {
       user_id: ctx.session.user.id,
       firstDay,
@@ -69,9 +65,9 @@ export const BotModule = () => {
     const expenseItemsArray = await expenseItemsController.getItems(ctx.session.user.id);
     if (costs.length > 0) {
       const res = expenseItemsArray.reduce((accumulator, item) => {
-        const allCosts = costs.filter(i => +i.expense_item_id === +i.id);
+        const allCosts = costs.filter(i => +i.expense_item_id === +item.id);
         const allCostsSum = allCosts.reduce((accum, j) => {
-          return accum += j.amount;
+          return accum += +j.amount;
         }, 0);
         return accumulator += `${item.name}: ${allCostsSum};\n`;
       }, "");
@@ -90,14 +86,6 @@ export const BotModule = () => {
     ctx.session.status = SHOW_EXPENSE_ITEM;
     const items = await expenseItemsController.getItems(ctx.session.user.id);
     if (items.length > 0) {
-      // const result = items.reduce((accumulator, item) => {
-      //   return accumulator + `${item.name}\n`;
-      // }, "");
-
-      // ctx.replyWithHTML(`<b>Список Статей расходов:</b>\n\n${result}`)
-      // const menu = await expenseItemEditKeyboard(ctx.session.user.id);
-      // ctx.reply(`Список Статей расходов: `, menu);
-
       const keyboard = await expenseItemKeyboard(ctx.session.user.id);
       ctx.reply(
         'Список Статей расходов(кликни для редактирования или уаления): ',
@@ -107,6 +95,12 @@ export const BotModule = () => {
     } else {
       ctx.reply('Статей расходов нет...');
     }
+  });
+  Bot.hears(SHOW_COSTS_FOR_DATE, async ctx => {
+    ctx.session.status = SELECT_DATE_SEE_EXPENSES;
+    ctx.reply(
+      'Чтобы просмотреть расходы за интересующую тебя дату, просто напиши дату в формате ДД.ММ.ГГГГ и отправь боту'
+    );
   });
   Bot.action(['edit', 'delete'], async ctx => {
     const status = ctx.session.status;
@@ -121,6 +115,18 @@ export const BotModule = () => {
       if (ctx.callbackQuery.data === 'edit') {
         ctx.editMessageText('Введите новое название Статьи расходов');
         ctx.session.status = EDIT_EXPENSE_ITEM_ACTION;
+      }
+    }
+    if (status === EDIT_OR_DELETE_COST_ACTION) {
+      if (ctx.callbackQuery.data === 'delete') {
+        ctx.replyWithHTML(
+          `Вы действительно хотите удалить расход?`,
+          yesNoKeyboard()
+        )
+        ctx.session.status = DELETE_COST_ACTION;
+      } else {
+        ctx.replyWithHTML('Что поменять у расхода: ', chooseCostKeyboard());
+        ctx.session.status = EDIT_COST_ACTION;
       }
     }
   });
@@ -150,14 +156,14 @@ export const BotModule = () => {
         const string = ctx.message.text;
         const dateArray = string.split('.');
         const year = dateArray[2];
-        const month = dateArray[1].indexOf(0) > -1 ? dateArray[1].slice(1,2) : dateArray[1];
+        const month = dateArray[1].indexOf("0") > -1 ? dateArray[1].replace("0", "") : dateArray[1];
         const day = dateArray[0];
         if (day && month && year) {
-          const date = new Date(year, month, day, 12, 0);
+          const date = new Date(year, month - 1, day, 12, 0);
           ctx.session.date = date.getTime();
           ctx.replyWithHTML(
             `Вы действительно хотите добавить расходы за:\n\n`+
-            `<i>${date.getDate()}.${date.getMonth() < 10 ? `0${date.getMonth()}` : date.getMonth()}.${date.getFullYear()}</i>`,
+            `<i>${date.getDate()}.${date.getMonth() + 1 < 10 ? `0${date.getMonth() + 1}` : date.getMonth() + 1}.${date.getFullYear()}</i>`,
             yesNoKeyboard()
           );
           ctx.session.status = ADD_TODAY_ACTION;
@@ -182,11 +188,11 @@ export const BotModule = () => {
       case SELECT_MONTH_SEE_EXPENSES:
         const str = ctx.message.text;
         const dateArr = str.split('.');
-        const selectedMonth = dateArr[0];
+        const selectedMonth = dateArr[0].replace("0", "") - 1;
         const selectedYear = dateArr[1];
         if (selectedMonth && selectedYear) {
-          const firstDay = (new Date(selectedYear, selectedMonth, 1, 12)).getTime();
-          const lastDay = (new Date(selectedYear, selectedMonth + 1, 0, 12)).getTime();
+          const firstDay = (new Date(selectedYear, selectedMonth, 1)).getTime();
+          const lastDay = (new Date(selectedYear, selectedMonth + 1, 0)).getTime();
           const data = {
             user_id: ctx.session.user.id,
             firstDay,
@@ -196,9 +202,9 @@ export const BotModule = () => {
           const expenseItemsArray = await expenseItemsController.getItems(ctx.session.user.id);
           if (costs.length > 0) {
             const res = expenseItemsArray.reduce((accumulator, item) => {
-              const allCosts = costs.filter(i => +i.expense_item_id === +i.id);
+              const allCosts = costs.filter(i => +i.expense_item_id === +item.id);
               const allCostsSum = allCosts.reduce((accum, j) => {
-                return accum += j.amount;
+                return accum += +j.amount;
               }, 0);
               return accumulator += `${item.name}: ${allCostsSum};\n`;
             }, "");
@@ -218,6 +224,88 @@ export const BotModule = () => {
           `<i>${ctx.message.text}</i>`,
           yesNoKeyboard()
         )
+        break;
+
+      case SELECT_DATE_SEE_EXPENSES:
+        const date = ctx.message.text;
+        const dateInArr = date.split('.');
+        const dayInDate = dateInArr[0];
+        const monthInDate = dateInArr[1].replace("0", "");
+        const yearInDate = dateInArr[2];
+        if (dayInDate && monthInDate && yearInDate) {
+          const startThisDay = (new Date(+yearInDate, +monthInDate - 1, +dayInDate, 0, 0, 0)).getTime();
+          const endThisDay = (new Date(+yearInDate, +monthInDate - 1, +dayInDate, 23, 59, 59)).getTime();
+          const thisDateData = {
+            user_id: ctx.session.user.id,
+            firstDay: startThisDay,
+            lastDay: endThisDay,
+          }
+          const costs = await costController.getCostsForPeriod(thisDateData);
+          if (costs.length > 0) {
+            ctx.session.status = SELECT_DATE_CHOOSE_COST;
+            const costsInKeyboard = await costsKeyboard(thisDateData);
+            ctx.reply("Список расходов(кликни для редактирования или удаления): ", costsInKeyboard);
+          } else {
+            ctx.reply('Нет расходов за текущую дату...');
+          }
+        } else {
+          ctx.reply(
+            'Чтобы просмотреть расходы за интересующую тебя дату, просто напиши дату в формате ДД.ММ.ГГГГ и отправь боту'
+          );
+        }
+        break;
+
+      case EDIT_COST_ADD_NEW_AMOUNT_ACTION:
+        try {
+          const { id, user_id } = ctx.session.changeCost;
+          const cost = await costController.setAmount({
+            id,
+            userId: user_id,
+            amount: ctx.message.text
+          });
+          ctx.reply('Изменил размер расхода!');
+          ctx.session.status = SUCCESS_EDIT_COST_ACTION;
+        } catch(e) {
+          ctx.reply('Ошибка: не получилось изменить размер расхода...');
+          ctx.session.status = ERROR_ACTION;
+        }
+
+        break;
+
+      case EDIT_COST_ADD_NEW_DAY_ACTION:
+        try {
+          const string = ctx.message.text;
+          const dateArray = string.split('.');
+          const year = dateArray[2];
+          const month = dateArray[1].indexOf(0) > -1 ? dateArray[1].replace("0", "") : dateArray[1];
+          const day = dateArray[0];
+          if (day && month && year) {
+            const date = new Date(year, month - 1, day, 12, 0);
+            ctx.session.changeCost.date = date.getTime();
+            ctx.replyWithHTML(
+              `Вы действительно хотите поменять дату на:\n\n`+
+              `<i>${date.getDate()}.${date.getMonth() + 1 < 10 ? `0${date.getMonth() + 1}` : date.getMonth() + 1}.${date.getFullYear()}</i>`,
+              yesNoKeyboard()
+            );
+          } else {
+            ctx.reply(
+              'Введите дату расхода в формате: ДД.ММ.ГГГГ'
+            );
+          }
+        } catch(e) {
+          ctx.reply('Ошибка: не получилось изменить дату...');
+          ctx.session.status = ERROR_ACTION;
+        }
+        break;
+
+      case EDIT_COST_ADD_NEW_DESCRIPTION_ACTION:
+        ctx.session.changeCost.description = ctx.message.text;
+        ctx.replyWithHTML(
+          `Вы действительно хотите изменить описание на:\n\n`+
+          `<i>${ctx.message.text}</i>`,
+          yesNoKeyboard()
+        )
+        break;
 
       default:
         break;
@@ -359,6 +447,55 @@ export const BotModule = () => {
         }
         break;
 
+      case DELETE_COST_ACTION:
+        if (ctx.callbackQuery.data === 'yes') {
+          const cost = await costController.deleteCost(ctx.session.changeCost);
+          ctx.editMessageText('Удалено...');
+          ctx.session.status = DELETED_COST_ACTION;
+        } else {
+          ctx.session.changeCost = {
+            id: subStringArray[1],
+            user_id: subStringArray[2],
+          }
+          const cost = await costController.getCost(ctx.session.changeCost);
+          ctx.replyWithHTML(
+            `Что сделать с расходом: ${cost[0].amount} рублей\n\n`,
+            EditKeyboard()
+          );
+          ctx.session.status = EDIT_OR_DELETE_COST_ACTION;
+        }
+        break;
+
+      case EDIT_COST_ADD_NEW_DESCRIPTION_ACTION:
+        if (ctx.callbackQuery.data === 'yes') {
+          const { id, user_id } = ctx.session.changeCost;
+          const cost = await costController.setDescription({
+            id,
+            userId: user_id,
+            description: ctx.message.text
+          });
+          ctx.editMessageText('Изменил описание!');
+          ctx.session.status = SUCCESS_EDIT_COST_ACTION;
+        } else {
+          ctx.editMessageText('Введите текст, чтобы изменить описание');
+        }
+        break;
+
+      case EDIT_COST_ADD_NEW_DAY_ACTION:
+        if (ctx.callbackQuery.data === 'yes') {
+          const { id, user_id, date } = ctx.session.changeCost;
+          const cost = await costController.setDay({
+            id,
+            userId: user_id,
+            timestamp: date
+          });
+          ctx.editMessageText('Изменил дату расхода!');
+          ctx.session.status = SUCCESS_EDIT_COST_ACTION;
+        } else {
+          ctx.editMessageText('Введите дату в формате: ДД.ММ.ГГГГ, чтобы изменить дату');
+        }
+        break;
+
       default:
         break;
     }
@@ -386,10 +523,38 @@ export const BotModule = () => {
     }
   });
 
-  Bot.action(async (ctx) => { // перечень статей расхода
+  Bot.action([
+    EDIT_COST_AMOUNT_ACTION,
+    EDIT_COST_EXPENSE_ITEM_ACTION,
+    EDIT_COST_DAY_ACTION,
+    EDIT_COST_DESCRIPTION_ACTION,
+  ], async ctx => {
+    const status = ctx.session.status;
+    if (status === EDIT_COST_ACTION) {
+      if (ctx.callbackQuery.data === EDIT_COST_AMOUNT_ACTION) {
+        ctx.reply('Введите новое значение расхода: ');
+        ctx.session.status = EDIT_COST_ADD_NEW_AMOUNT_ACTION;
+      }
+      if (ctx.callbackQuery.data === EDIT_COST_EXPENSE_ITEM_ACTION) {
+        const bord = await expenseItemKeyboard(ctx.session.user.id);
+        ctx.reply('Выберите новую Статью расходов: ', bord);
+        ctx.session.status = EDIT_COST_ADD_NEW_EXPENSE_ITEM_ACTION;
+      }
+      if (ctx.callbackQuery.data === EDIT_COST_DAY_ACTION) {
+        ctx.reply('Введите новую дату расхода в формате: ДД.ММ.ГГГГ');
+        ctx.session.status = EDIT_COST_ADD_NEW_DAY_ACTION;
+      }
+      if (ctx.callbackQuery.data === EDIT_COST_DESCRIPTION_ACTION) {
+        ctx.reply('Введите новое описание: ');
+        ctx.session.status = EDIT_COST_ADD_NEW_DESCRIPTION_ACTION;
+      }
+    }
+  });
+
+  Bot.action(async (ctx) => { // перечень статей расхода/расходов
     const array = ctx.split('/');
-    const items = await expenseItemsController.getItems(+array[2]);
-    return items.map(item => `expenseItem/${item.id}`)
+    const items = array[0] === "cost" ? await costController.getCosts(+array[2]) : await expenseItemsController.getItems(+array[2]);
+    return items.map(item => `${array[0]}/${item.id}/${array[2]}`)
   }, async ctx => {
     const status = ctx.session.status;
     if (status === ADD_EXPENSE_ITEM_ACTION) {
@@ -424,16 +589,39 @@ export const BotModule = () => {
       ctx.replyWithHTML(
         `Что сделать со Статьей расходов: ${ctx.session.changeExpenseItem.name}\n\n`,
         EditKeyboard()
-        // EditKeyboard({
-        //   id: ctx.session.changeExpenseItem.id,
-        //   slug: ctx.session.changeExpenseItem.slug,
-        // })
       );
       ctx.session.status = EDIT_OR_DELETE_EXPENSE_ITEM_ACTION;
+    }
+    if (status === SELECT_DATE_CHOOSE_COST) {
+      const string = ctx.callbackQuery.data;
+      const subStringArray = string.split('/');
+      ctx.session.changeCost = {
+        id: subStringArray[1],
+        user_id: subStringArray[2],
+      }
+      const cost = await costController.getCost(ctx.session.changeCost);
+      ctx.replyWithHTML(
+        `Что сделать с расходом: ${cost[0].amount} рублей\n\n`,
+        EditKeyboard()
+      );
+      ctx.session.status = EDIT_OR_DELETE_COST_ACTION;
+    }
+    if (status === EDIT_COST_ADD_NEW_EXPENSE_ITEM_ACTION) {
+      try {
+        const { id, user_id } = ctx.session.changeCost;
+        const cost = await costController.setExpenseItem({
+          id,
+          userId: user_id,
+          expense_item_id: ctx.callbackQuery.data.split("/")[1]
+        });
+        ctx.reply('Изменил Статью расхода!');
+        ctx.session.status = SUCCESS_EDIT_COST_ACTION;
+      } catch(e) {
+        ctx.reply('Ошибка: не получилось изменить Статью расходов...');
+        ctx.session.status = ERROR_ACTION;
+      }
     }
   });
 
   Bot.launch();
 }
-
-// module.exports = { BotModule }
